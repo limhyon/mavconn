@@ -37,14 +37,6 @@ PxCameraManagerFactory::generate(const std::string& type)
 		}
 		return fireflyCameraManager;
 	}
-//	else if (type.compare("opencv") == 0)
-//		{
-//			if (opencvCameraManager.get() == 0)
-//			{
-//				opencvCameraManager = PxCameraManagerPtr(new PxOpenCVCameraManager);
-//			}
-//			return opencvCameraManager;
-//		}
 	else
 	{
 		return PxCameraManagerPtr();

@@ -11,7 +11,7 @@ class VideoCapture;
 class PxOpenCVCameraManager : public PxCameraManager
 {
 public:
-	PxOpenCVCameraManager();
+	PxOpenCVCameraManager(bool _isDepth);
 	~PxOpenCVCameraManager();
 
 	PxCameraPtr generateCamera(uint64_t captureIndex);
@@ -21,6 +21,7 @@ public:
 
 private:
 	cv::VideoCapture* getCamera(uint64_t captureIndex);
+	bool isDepth;
 };
 
 #endif
