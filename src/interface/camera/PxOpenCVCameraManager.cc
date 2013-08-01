@@ -16,6 +16,7 @@ PxCameraPtr
 PxOpenCVCameraManager::generateCamera(uint64_t captureIndex)
 {
 	cv::VideoCapture *cap = getCamera(captureIndex);
+
 	if(cap->isOpened())
 	{
 		return PxCameraPtr(new PxOpenCVCamera(cap));

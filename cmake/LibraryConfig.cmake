@@ -61,6 +61,7 @@ FIND_PACKAGE(GLIBMM2)
 FIND_PACKAGE(SIGC++)
 FIND_PACKAGE(JPEG_TURBO)
 FIND_PACKAGE(VICON)
+FIND_PACKAGE(OPENNI)
 
 ##### Boost #####
 # Expand the next statement if newer boost versions than 1.36.1 are released

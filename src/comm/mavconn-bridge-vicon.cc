@@ -44,7 +44,7 @@ char rotor(void)
 }
 
 void* infoThread(void* clientData)
-		{
+{
 	double lastTime = PxVicon::getTime();
 
 	while (!quit)
@@ -64,7 +64,7 @@ void* infoThread(void* clientData)
 		usleep(100000);
 	}
 	pthread_exit(NULL);
-		}
+}
 
 int main(int argc, char** argv)
 {

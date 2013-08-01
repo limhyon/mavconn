@@ -62,6 +62,7 @@ typedef struct _bufferIMU
 mavlink_attitude_t last_known_attitude;
 mavlink_local_position_ned_t last_known_control_position;
 mavlink_optical_flow_t last_known_optical_flow;
+mavlink_vicon_position_estimate_t last_known_vicon_position;
 
 const int MAGIC_MAX_BUFFER_AND_RETRY = 100;		// Size of the message buffer for LCM messages and maximum number of skipped/dropped frames before stopping when a mismatch happens
 const int MAGIC_MIN_SEQUENCE_DIFF = 150;		// *has to be > than MAGIC_MAX_BUFFER_AND_RETRY!* Minimum difference between two consecutively processed images to assume a sequence mismatch
@@ -174,6 +175,12 @@ mavlinkHandler(const lcm_recv_buf_t* rbuf, const char* channel,
 		{
 			metaDataMutex.lock();
 			mavlink_msg_optical_flow_decode(msg, &last_known_optical_flow);
+			metaDataMutex.unlock();
+		}
+		else if (msg->msgid == MAVLINK_MSG_ID_VICON_POSITION_ESTIMATE)
+		{
+			metaDataMutex.lock();
+			mavlink_msg_vicon_position_estimate_decode(msg, &last_known_vicon_position);
 			metaDataMutex.unlock();
 		}
 	}
@@ -517,6 +524,7 @@ int main(int argc, char* argv[])
 	memset(&last_known_attitude, 0, sizeof(mavlink_attitude_t));
 	memset(&last_known_control_position, 0, sizeof(mavlink_local_position_ned_t));
 	memset(&last_known_optical_flow, 0, sizeof(mavlink_optical_flow_t));
+	memset(&last_known_vicon_position, 0, sizeof(last_known_vicon_position));
 
 	uint64_t lastShutter = 0;
 //	uint64_t lastMessageDelay = 0;
@@ -815,9 +823,9 @@ int main(int argc, char* argv[])
 			image_data.lat = last_known_control_position.y;
 			image_data.alt = last_known_control_position.z;
 			image_data.local_z = last_known_optical_flow.ground_distance;
-			image_data.ground_x = 0.f;
-			image_data.ground_y = 0.f;
-			image_data.ground_z = 0.f;
+			image_data.ground_x = last_known_vicon_position.x;
+			image_data.ground_y = last_known_vicon_position.y;
+			image_data.ground_z = last_known_vicon_position.z;
 			image_data.seq = 0;
 			metaDataMutex.unlock();
 

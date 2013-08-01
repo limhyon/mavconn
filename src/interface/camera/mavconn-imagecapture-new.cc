@@ -69,6 +69,7 @@ float backupYaw;
 #define IMAGE_CAPTURE_FILE		"imagedata.txt"
 #define PLAIN_CAPTURE_FILE		"imagedata_extended.txt"
 #define MULTI_COMPONENT_CAPTURE_FILE	"imagedata_extended_multi_component.txt"
+#define NUMBER_PRECISION	3
 
 using namespace std;
 
@@ -143,21 +144,21 @@ static void image_writer (void)
 		if (data->direction == 0)
 		{
 			strDirection = DIRECTUION_0_DIR;
-			imageDataFileDirection0.precision(32);
+			imageDataFileDirection0.precision(NUMBER_PRECISION);
 			imageDataFileDirection0 << data->timestamp << ", " << data->roll << ", " << data->pitch << ", " << data->yaw << ", " << data->lat << ", " << data->lon << ", " << data->alt << ", " << data->ground_dist << ", " << data->gx << ", " << data->gy << ", " << data->gz << endl;
-			plainLogFileDirection0.precision(32);
+			plainLogFileDirection0.precision(NUMBER_PRECISION);
 			plainLogFileDirection0 << data->timestamp << ", " << data->roll << ", " << data->pitch << ", " << data->yaw << ", " << data->lat << ", " << data->lon << ", " << data->alt << ", " << data->pres_alt << ", " << data->ground_dist << ", " << data->vdop << ", " << data->hdop << ", " << data->satcount << ", " << data->local_x_gps_raw << ", " << data->local_y_gps_raw << ", " << data->local_z_gps_raw << ", " << data->vx << ", " << data->vy << ", " << data->vz << ", " << data->gx << ", " << data->gy << ", " << data->gz << ", " << data->gvx << ", " << data->gvy << ", " << data->gvz << endl;
-			plainLogFileMultiDirection0.precision(32);
+			plainLogFileMultiDirection0.precision(NUMBER_PRECISION);
 			plainLogFileMultiDirection0 << data->timestamp << ", " << data->roll << ", " << data->pitch << ", " << data->yaw << ", " << data->lat << ", " << data->lon << ", " << data->alt << ", " << data->pres_alt << ", " << data->ground_dist << ", " << data->vdop << ", " << data->hdop << ", " << data->satcount << ", " << data->local_x_gps_raw << ", " << data->local_y_gps_raw << ", " << data->local_z_gps_raw << ", " << data->local_x << ", " << data->local_y << ", " << data->local_z << ", " << data->vx << ", " << data->vy << ", " << data->vz << ", " << data->gx << ", " << data->gy << ", " << data->gz << ", " << data->gvx << ", " << data->gvy << ", " << data->gvz << endl;
 		}
 		else
 		{
 			strDirection = DIRECTUION_1_DIR;
-			imageDataFileDirection1.precision(32);
+			imageDataFileDirection1.precision(NUMBER_PRECISION);
 			imageDataFileDirection1 << data->timestamp << ", " << data->roll << ", " << data->pitch << ", " << data->yaw << ", " << data->lat << ", " << data->lon << ", " << data->alt << ", " << data->ground_dist << ", " << data->gx << ", " << data->gy << ", " << data->gz << endl;
-			plainLogFileDirection1.precision(32);
+			plainLogFileDirection1.precision(NUMBER_PRECISION);
 			plainLogFileDirection1 << data->timestamp << ", " << data->roll << ", " << data->pitch << ", " << data->yaw << ", " << data->lat << ", " << data->lon << ", " << data->alt << ", " << data->pres_alt << ", " << data->ground_dist << ", " << data->vdop << ", " << data->hdop << ", " << data->satcount << ", " << data->local_x_gps_raw << ", " << data->local_y_gps_raw << ", " << data->local_z_gps_raw << ", " << data->vx << ", " << data->vy << ", " << data->vz << ", " << data->gx << ", " << data->gy << ", " << data->gz << ", " << data->gvx << ", " << data->gvy << ", " << data->gvz << endl;
-			plainLogFileMultiDirection1.precision(32);
+			plainLogFileMultiDirection1.precision(NUMBER_PRECISION);
 			plainLogFileMultiDirection1 << data->timestamp << ", " << data->roll << ", " << data->pitch << ", " << data->yaw << ", " << data->lat << ", " << data->lon << ", " << data->alt << ", " << data->pres_alt << ", " << data->ground_dist << ", " << data->vdop << ", " << data->hdop << ", " << data->satcount << ", " << data->local_x_gps_raw << ", " << data->local_y_gps_raw << ", " << data->local_z_gps_raw << ", " << data->local_x << ", " << data->local_y << ", " << data->local_z << ", " << data->vx << ", " << data->vy << ", " << data->vz << ", " << data->gx << ", " << data->gy << ", " << data->gz << ", " << data->gvx << ", " << data->gvy << ", " << data->gvz << endl;
 		}
 
@@ -429,7 +430,7 @@ void prepareCaptureFile( ofstream& file, const string& dir, const string& filena
 {
 	cout << "Writing " << type << " capture data into " << dir << filename << endl;
 	file.open((dir + filename).c_str(), ios::out);
-	file << "# Data capture for camera head on MAVCONN vehicle." << endl;
+	file << "# Data capture for camera head on UAV." << endl;
 	char dayBuf[20], timeBuf[20];
 	strftime( dayBuf, 20, "%Y-%m-%d\0", timeinfo );
 	strftime( timeBuf, 20, "%H:%M\0", timeinfo );
@@ -558,7 +559,7 @@ static void mavlink_handler (const lcm_recv_buf_t *rbuf, const char * channel, c
 		break;
 		case MAVLINK_MSG_ID_LOCAL_POSITION_NED:
 		{
-			if (mavlink_msg->compid == imuid)
+			//if (mavlink_msg->compid == imuid)
 			{
 				mavlink_local_position_ned_t pos;
 				mavlink_msg_local_position_ned_decode(mavlink_msg, &pos);
@@ -568,13 +569,14 @@ static void mavlink_handler (const lcm_recv_buf_t *rbuf, const char * channel, c
 				vx = pos.vx;
 				vy = pos.vy;
 				vz = pos.vz;
+				//cout << "x = " << local_x << ", y = " << local_y << ", z = " << local_z << endl;
 			}
 		}
 		break;
 			
 		case MAVLINK_MSG_ID_ATTITUDE:
 		{
-			if (mavlink_msg->compid == imuid)
+			//if (mavlink_msg->compid == imuid)
 			{
 				mavlink_attitude_t att;
 				mavlink_msg_attitude_decode(mavlink_msg, &att);

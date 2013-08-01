@@ -137,6 +137,7 @@ PIXHAWK_LINK_LIBRARIES(mavconn_cam_opencv
   ${OPENCV_CORE_LIBRARY}
   ${OPENCV_HIGHGUI_LIBRARY}
   ${SIGC++_LIBRARY}
+  ${OPENNI_LIBRARY_OPTIMIZED}
   lcm
   mavconn_lcm
   mavconn_shm

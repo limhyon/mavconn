@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <glibmm.h>
 #include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
 #include <tr1/memory>
 
 class PxCameraConfig
