@@ -164,12 +164,37 @@ cameraGrab(PxCameraPtr& pxCam, cv::Mat *frame, uint32_t *skippedFrames, uint32_t
 	imageMutex.lock();
 	while (!quit)
 	{
+		//! Just retrieve RGB image (normal camera)
 		if (pxCam->grabFrame(*frame, *skippedFrames, *sequenceNum))
 		{
 			imageGrabbedMutex.lock();
 			imageGrabbed = true;
 			imageGrabbedCond->signal();
 			imageGrabbedMutex.unlock();
+			while (!processingDone && !quit)	// go waiting (releases the lock)
+			{
+				processingDoneCond->wait(imageMutex);
+			}
+
+			processingDone = false;	//reset assert variable
+		}
+	}
+}
+
+void cameraDepthGrab(PxCameraPtr& pxDepthCam,
+					  cv::Mat *frame, cv::Mat *frameRight,
+					  uint32_t *skippedFrames, uint32_t *sequenceNum)
+{
+	imageMutex.lock();
+	while (!quit)
+	{
+		if (pxDepthCam->grabFrame(*frame, *frameRight, *skippedFrames, *sequenceNum))
+		{
+			imageGrabbedMutex.lock();
+			imageGrabbed = true;
+			imageGrabbedCond->signal();
+			imageGrabbedMutex.unlock();
+	
 			while (!processingDone && !quit)	// go waiting (releases the lock)
 			{
 				processingDoneCond->wait(imageMutex);
@@ -238,7 +263,7 @@ int main(int argc, char* argv[])
 									("type", config::value<std::string>(&camType)->default_value("opencv"), "Camera type: {opencv|opencv-depth|bluefox|firefly]")
 									("serial_right", config::value<uint64_t>(&camSerialRight)->default_value(0), "Enable stereo camera mode. Expects serial # of the right camera as argument. This will also enable (and only work with) the hardware trigger. Left cam is master.")
 									("serial", config::value<uint64_t>(&camSerial)->default_value(0), "Serial # of the camera to select")
-									("orientation", config::value<std::string>(&camOrientation)->default_value("downward"), "Orientation of camera: [downward|forward]")
+									("orientation", config::value<std::string>(&camOrientation)->default_value("forward"), "Orientation of camera: [downward|forward]")
 									("detectHorizontal,h", config::bool_switch(&detectHorizontal)->default_value(false), "Tries to detect horizontally scrambled images")
 									("detectThreshold,h", config::value<uint32_t>(&detectThreshold)->default_value(75), "Threshold for horizontal detector (Pixel count)")
 									("verbose,v", config::bool_switch(&verbose)->default_value(false), "Verbose output")
@@ -342,6 +367,14 @@ int main(int argc, char* argv[])
 	bool useStereo = false;
 	int cameraCount = camManager->getCameraCount();
 
+	//! Hack : depth camera as stereo.
+	if(camType.compare("opencv-depth") == 0){
+		fprintf(stderr, "# Use RGBD camera as stereo\n");
+		useStereo = true;
+	}
+
+	fprintf(stderr,"# INFO: Num cameras detected : %d\n",cameraCount);
+
 	if (camSerialRight == 0)
 	{
 		if (cameraCount > 0)
@@ -350,6 +383,10 @@ int main(int argc, char* argv[])
 			if (pxCam.get() == 0)
 			{
 				exit(EXIT_FAILURE);
+			}
+			else
+			{
+				fprintf(stderr, "# INFO: Camera open succeeded\n");
 			}
 		}
 		else
@@ -396,6 +433,7 @@ int main(int argc, char* argv[])
 	{
 		if (useStereo)
 		{
+			fprintf(stderr,"# INFO: SET RIGHT CAMERA (STEREO)\n");
 			camRight = px::SHM::CAMERA_DOWNWARD_RIGHT;
 		}
 
@@ -405,6 +443,7 @@ int main(int argc, char* argv[])
 	{
 		if (useStereo)
 		{
+			fprintf(stderr,"# INFO: SET RIGHT CAMERA (STEREO)\n");
 			camRight = px::SHM::CAMERA_FORWARD_RIGHT;
 		}
 
@@ -437,7 +476,7 @@ int main(int argc, char* argv[])
 	}
 	PxCameraConfig config(mode, frameRate, trigger, exposure, gain, gamma);
 
-	if (useStereo)
+	if (useStereo && camType.compare("opencv-depth") != 0)
 	{
 		fprintf(stderr, "# INFO: Opening stereo with serial #%llu and #%llu, trigger is: enabled\n", (long long unsigned) camSerial, (long long unsigned) camSerialRight);
 		if (!pxStereoCam->init())
@@ -451,6 +490,20 @@ int main(int argc, char* argv[])
 		if (!pxStereoCam->start())
 		{
 			fprintf(stderr, "# ERROR: Cannot start stereo setup.\n");
+			exit(EXIT_FAILURE);
+		}
+	}
+	else if(useStereo && camType.compare("opencv-depth") == 0)
+	{
+		fprintf(stderr, "# INFO: Opening camera with serial #%llu, trigger is: %s\n", (long long unsigned) camSerial, (trigger) ? "enabled" : "disabled");
+		if(!pxCam->init())
+		{
+			fprintf(stderr, "# ERROR: Cannot initialize camera setup.\n");
+			exit(EXIT_FAILURE);
+		}
+		if(!pxCam->start())
+		{
+			fprintf(stderr, "# ERROR: Cannot start camera setup.\n");
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -513,12 +566,21 @@ int main(int argc, char* argv[])
 		//start the libdc1394 grabbing thread
 		try
 		{
-			if (useStereo)
+			if (useStereo && camType.compare("opencv-depth") != 0)
 			{
+				//! True stereo camera
 				imageThread = Glib::Thread::create(sigc::bind(sigc::ptr_fun(cameraStereoGrab), pxStereoCam, &frame, &frameRight, &skippedFrames, &sequenceNum), true);
+			}
+			else if(useStereo && camType.compare("opencv-depth") == 0)
+			{
+				//! in case depth image
+				fprintf(stderr,"### Capturing RGBD\n");
+				imageThread = Glib::Thread::create(sigc::bind(sigc::ptr_fun(cameraDepthGrab), pxCam, &frame, &frameRight, &skippedFrames, &sequenceNum), true);
 			}
 			else
 			{
+				//! Monocular image case
+				fprintf(stderr,"### Capturing Monocular camera\n");
 				imageThread = Glib::Thread::create(sigc::bind(sigc::ptr_fun(cameraGrab), pxCam, &frame, &skippedFrames, &sequenceNum), true);
 			}
 		}
@@ -565,7 +627,7 @@ int main(int argc, char* argv[])
 	}
 	else
 	{
-		if (useStereo)
+		if (useStereo && camType.compare("opencv-depth") != 0)
 		{
 			if (!pxStereoCam->grabFrame(frame, frameRight, skippedFrames, sequenceNum))
 			{
@@ -767,7 +829,7 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
-			if (useStereo)
+			if (useStereo && camType.compare("opencv-depth") != 0)
 			{
 				if (!pxStereoCam->grabFrame(frame, frameRight, skippedFrames, sequenceNum))
 				{
@@ -781,6 +843,17 @@ int main(int argc, char* argv[])
 				{
 					grabFailCount = 0;
 				}
+			}
+			if(useStereo && camType.compare("opencv-depth") == 0)
+			{
+				if(!pxCam->grabFrame(frame,frameRight,skippedFrames, sequenceNum))
+				{
+					grabFailCount++;
+					if(!verbose)
+						fprintf(stderr, "# INFO: Cannot grab frame.\n");
+				}
+				else
+					grabFailCount = 0;
 			}
 			else
 			{
@@ -1064,7 +1137,7 @@ int main(int argc, char* argv[])
 		firstFrameRubbishCheck = true;
 	} // main loop
 
-	if (useStereo)
+	if (useStereo && camType.compare("opencv-depth") != 0)
 	{
 		pxStereoCam->stop();
 	}

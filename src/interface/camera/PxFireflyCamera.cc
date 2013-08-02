@@ -409,6 +409,13 @@ PxFireflyCamera::grabFrame(cv::Mat& image, uint32_t& skippedFrames,
 }
 
 bool
+PxFireflyCamera::grabFrame(cv::Mat& image, cv::Mat& depth, uint32_t& skippedFrames,
+						   uint32_t& sequenceNum)
+{
+	return true;
+}
+
+bool
 PxFireflyCamera::setExternalTrigger(void)
 {
 	uint32_t desiredPinDirection[4] = {0, 1, 1, 0};

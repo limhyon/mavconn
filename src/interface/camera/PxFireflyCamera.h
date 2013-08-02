@@ -53,6 +53,8 @@ public:
 
 	bool grabFrame(cv::Mat& image, uint32_t& skippedFrames,
 				   uint32_t& sequenceNum);
+	bool grabFrame(cv::Mat& image, cv::Mat& depth, uint32_t& skippedFrames,
+				   uint32_t& sequenceNum);
 
 private:
 	bool setExternalTrigger(void);

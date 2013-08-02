@@ -80,8 +80,8 @@ public:
 	virtual bool start(void) = 0;
 	virtual bool stop(void) = 0;
 
-	virtual bool grabFrame(cv::Mat& image, uint32_t& skippedFrames,
-						   uint32_t& sequenceNum) = 0;
+	virtual bool grabFrame(cv::Mat& image, uint32_t& skippedFrames, uint32_t& sequenceNum) = 0;
+	virtual bool grabFrame(cv::Mat& image, cv::Mat& depth, uint32_t& skippedFrames, uint32_t& sequenceNum) = 0;
 
 protected:
 	bool verbose;

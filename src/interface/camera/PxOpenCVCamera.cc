@@ -109,13 +109,26 @@ PxOpenCVCamera::stop(void)
 }
 
 bool
-PxOpenCVCamera::grabFrame(cv::Mat& image, uint32_t& skippedFrames,
-						   uint32_t& sequenceNum)
+PxOpenCVCamera::grabFrame(cv::Mat& image, uint32_t& skippedFrames, uint32_t& sequenceNum)
 {
 	bool res = camera->grab();
+
 	if(res)
 	{
 		res = camera->retrieve(image);
+	}
+	return res;
+}
+
+bool
+PxOpenCVCamera::grabFrame(cv::Mat& image, cv::Mat& image_right, uint32_t& skippedFrames, uint32_t& sequenceNum)
+{
+	bool res = camera->grab();
+
+	if(res)
+	{
+			res = camera->retrieve(image_right,CV_CAP_OPENNI_DEPTH_MAP);
+			res = camera->retrieve(image,CV_CAP_OPENNI_BGR_IMAGE);
 	}
 	return res;
 }

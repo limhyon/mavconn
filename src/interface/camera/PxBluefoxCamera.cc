@@ -176,6 +176,13 @@ PxBluefoxCamera::grabFrame(cv::Mat& image, uint32_t& skippedFrames,
 }
 
 bool
+PxBluefoxCamera::grabFrame(cv::Mat& image, cv::Mat& depth, uint32_t& skippedFrames,
+                           uint32_t& sequenceNum)
+{
+	return true;
+}
+
+bool
 PxBluefoxCamera::setSlave(void)
 {
     // use hardware real-time controller to synchronize to master camera

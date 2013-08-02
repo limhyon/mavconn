@@ -4,11 +4,9 @@
 #include "PxBluefoxCameraManager.h"
 #endif
 #include "PxFireflyCameraManager.h"
-//#include "PxOpenCVCameraManager.h"
 
 PxCameraManagerPtr PxCameraManagerFactory::bluefoxCameraManager;
 PxCameraManagerPtr PxCameraManagerFactory::fireflyCameraManager;
-//PxCameraManagerPtr PxCameraManagerFactory::opencvCameraManager;
 
 PxCameraManagerPtr
 PxCameraManagerFactory::generate(const std::string& type)
