@@ -138,7 +138,7 @@ static void image_writer (void)
 		writeData *data = (writeData *) g_async_queue_pop(image_write_queue);
 
 		char fileName[128];
-		sprintf(fileName, "%llu.bmp", (long long unsigned)data->timestamp);
+		sprintf(fileName, "%llu.png", (long long unsigned)data->timestamp);
 
 		std::string strDirection;
 		if (data->direction == 0)
