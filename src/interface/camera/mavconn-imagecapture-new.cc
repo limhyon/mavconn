@@ -135,7 +135,19 @@ static void image_writer (void)
 	while(!quit)
 	{
 		//TODO: use timed_pop() here so that the process can be killed nicely...
-		writeData *data = (writeData *) g_async_queue_pop(image_write_queue);
+		writeData *data = (writeData *) g_async_queue_try_pop(image_write_queue);
+		
+		if(data == NULL)
+		{
+			if(verbose)
+				fprintf(stderr,"[MAVCONN] No data available\n");
+			continue;
+		}
+		
+		if(verbose)
+		{
+			fprintf(stderr,"[MAVCONN] Num images waiting to be written : %d\n",g_async_queue_length(image_write_queue));
+		}
 
 		char fileName[128];
 		sprintf(fileName, "%llu.png", (long long unsigned)data->timestamp);
@@ -173,10 +185,12 @@ static void image_writer (void)
 		}
 
 		++imgNum;
-		if (debug) printf("image written. \n");
+		
+		if (debug) fprintf(stderr,"[MAVCONN] image written (%d) \n",imgNum);
 
 		data->imgLeft.release();
 		data->imgRight.release();
+		
 		free(data);
 	}
 }
@@ -517,8 +531,30 @@ static void mavlink_handler (const lcm_recv_buf_t *rbuf, const char * channel, c
 					if (recordData)
 					{
 						// stop recording image data
-						if (verbose) printf("Stop recording.\n");
-
+						if (verbose) 
+							printf("Stop recording.\n");
+						
+						
+						mavlink_message_t msg;
+						mavlink_statustext_t statustext;
+						sprintf((char*)&statustext.text, "MAVCONN: imagecapture: Stopping ...");
+						mavlink_msg_statustext_encode(sysid, compid, &msg, &statustext);
+						sendMAVLinkMessage(lcmMavlink, &msg);
+						recordData = false;
+						bPause = false;
+						
+						// Wait something variable...
+						while(g_async_queue_length(image_write_queue) > 1)
+						{
+							sprintf((char*)&statustext.text, "MAVCONN: imagecapture: %d remaining ...", g_async_queue_length(image_write_queue));
+							mavlink_msg_statustext_encode(sysid, compid, &msg, &statustext);
+							sendMAVLinkMessage(lcmMavlink, &msg);
+						}
+						
+						sprintf((char*)&statustext.text, "MAVCONN: imagecapture: STOPPED RECORDING");
+						mavlink_msg_statustext_encode(sysid, compid, &msg, &statustext);
+						sendMAVLinkMessage(lcmMavlink, &msg);
+						
 						imageDataFileDirection0 << endl << "### EOF" << endl;
 						imageDataFileDirection0.close();
 						imageDataFileDirection1 << endl << "### EOF" << endl;
@@ -532,14 +568,6 @@ static void mavlink_handler (const lcm_recv_buf_t *rbuf, const char * channel, c
 						plainLogFileMultiDirection1 << endl << "### EOF" << endl;
 						plainLogFileMultiDirection1.close();
 						mavlinkFile.close();
-
-						mavlink_message_t msg;
-						mavlink_statustext_t statustext;
-						sprintf((char*)&statustext.text, "MAVCONN: imagecapture: STOPPED RECORDING");
-						mavlink_msg_statustext_encode(sysid, compid, &msg, &statustext);
-						sendMAVLinkMessage(lcmMavlink, &msg);
-						recordData = false;
-						bPause = false;
 					}
 				}
 			}
