@@ -141,7 +141,8 @@ static void mavlink_handler (const lcm_recv_buf_t *rbuf, const char * channel,
 					|| msg->msgid == MAVLINK_MSG_ID_SET_LOCAL_POSITION_SETPOINT
 					|| msg->msgid == MAVLINK_MSG_ID_SET_GLOBAL_POSITION_SETPOINT_INT
                     || msg->msgid == MAVLINK_MSG_ID_SET_POSITION_CONTROL_OFFSET
-                    || msg->msgid == MAVLINK_MSG_ID_OPTICAL_FLOW) {
+                    || msg->msgid == MAVLINK_MSG_ID_OPTICAL_FLOW
+			|| msg->msgid == MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN) {
 				if (verbose || debug)
 					std::cout << std::dec
 							<< "Received and forwarded LCM message with id "
@@ -187,7 +188,8 @@ static void mavlink_handler (const lcm_recv_buf_t *rbuf, const char * channel,
 			|| msg->msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT
 			|| msg->msgid == MAVLINK_MSG_ID_LOCAL_POSITION_NED
 			|| msg->msgid == MAVLINK_MSG_ID_LOCAL_POSITION_SETPOINT
-			|| msg->msgid == MAVLINK_MSG_ID_ATTITUDE))
+			|| msg->msgid == MAVLINK_MSG_ID_ATTITUDE
+			|| msg->msgid == MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN))
 		{
 			if (verbose || debug)
 					std::cout << std::dec
@@ -204,6 +206,11 @@ static void mavlink_handler (const lcm_recv_buf_t *rbuf, const char * channel,
 				//ioctl(fd, TIOCFLUSH, FWRITE);
 				tcflush(fd, TCOFLUSH);
 				if (messageLength != written) fprintf(stderr, "ERROR: Wrote %d bytes but should have written %d\n", written, messageLength);
+		}
+		else
+		{
+			fprintf(stderr,"[error] msg->sysid = %d, systemid = %d\n",msg->sysid, systemid);
+			fprintf(stderr,"[error] msg->msgid = %d\n",msg->msgid);
 		}
 
 		if (msg->msgid == MAVLINK_MSG_ID_PING)
