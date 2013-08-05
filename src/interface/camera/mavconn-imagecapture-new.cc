@@ -107,6 +107,9 @@ double lat = 0.f, lon = 0.f, alt = 0.f, vdop = 0.f, hdop = 0.f, satcount = 0.f;
 bool gotFirstImage = false;
 bool quit = false;
 
+//! For PNG Save options
+std::vector<int> pngParams;
+
 typedef struct _writeData
 {
 	int direction;
@@ -176,12 +179,12 @@ static void image_writer (void)
 
 		if (data->stereo)
 		{
-			cv::imwrite((captureDir + strDirection + std::string("left/") + fileName).c_str(), data->imgLeft);
-			cv::imwrite((captureDir + strDirection + std::string("right/") + fileName).c_str(), data->imgRight);
+			cv::imwrite((captureDir + strDirection + std::string("left/") + fileName).c_str(), data->imgLeft, pngParams);
+			cv::imwrite((captureDir + strDirection + std::string("right/") + fileName).c_str(), data->imgRight, pngParams);
 		}
 		else
 		{
-			cv::imwrite((captureDir + strDirection + std::string("left/") + fileName).c_str(), data->imgLeft);
+			cv::imwrite((captureDir + strDirection + std::string("left/") + fileName).c_str(), data->imgLeft, pngParams);
 		}
 
 		++imgNum;
@@ -453,6 +456,10 @@ void prepareCaptureFile( ofstream& file, const string& dir, const string& filena
 	file << "# Structure:" << endl;
 	file << "# " << structure << endl;
 	file << "##########" << endl << endl;
+	
+	//! PNG Param setup
+	pngParams.push_back(CV_IMWRITE_PNG_COMPRESSION);
+	params.push_back(0);   // that's compression level, 9 == full , 0 == none
 }
 
 /**
@@ -544,16 +551,15 @@ static void mavlink_handler (const lcm_recv_buf_t *rbuf, const char * channel, c
 						bPause = false;
 						
 						// Wait something variable...
-						while(g_async_queue_length(image_write_queue) > 1)
+						while(g_async_queue_length(image_write_queue) > 0)
 						{
-							sprintf((char*)&statustext.text, "MAVCONN: imagecapture: %d remaining ...", g_async_queue_length(image_write_queue));
-							mavlink_msg_statustext_encode(sysid, compid, &msg, &statustext);
-							sendMAVLinkMessage(lcmMavlink, &msg);
+							if(!(g_async_queue_length(image_write_queue) % 10))
+							{
+								sprintf((char*)&statustext.text, "MAVCONN: imagecapture: %d remaining ...", g_async_queue_length(image_write_queue));
+								mavlink_msg_statustext_encode(sysid, compid, &msg, &statustext);
+								sendMAVLinkMessage(lcmMavlink, &msg);
+							}
 						}
-						
-						sprintf((char*)&statustext.text, "MAVCONN: imagecapture: STOPPED RECORDING");
-						mavlink_msg_statustext_encode(sysid, compid, &msg, &statustext);
-						sendMAVLinkMessage(lcmMavlink, &msg);
 						
 						imageDataFileDirection0 << endl << "### EOF" << endl;
 						imageDataFileDirection0.close();
@@ -568,6 +574,10 @@ static void mavlink_handler (const lcm_recv_buf_t *rbuf, const char * channel, c
 						plainLogFileMultiDirection1 << endl << "### EOF" << endl;
 						plainLogFileMultiDirection1.close();
 						mavlinkFile.close();
+						
+						sprintf((char*)&statustext.text, "MAVCONN: imagecapture: STOPPED RECORDING");
+						mavlink_msg_statustext_encode(sysid, compid, &msg, &statustext);
+						sendMAVLinkMessage(lcmMavlink, &msg);
 					}
 				}
 			}
