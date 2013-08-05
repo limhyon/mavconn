@@ -153,7 +153,9 @@ static void image_writer (void)
 		}
 
 		char fileName[128];
-		sprintf(fileName, "%llu.png", (long long unsigned)data->timestamp);
+		char fileName2[128];
+		sprintf(fileName, "%llu.bmp", (long long unsigned)data->timestamp);
+		sprintf(fileName2, "%llu.png", (long long unsigned)data->timestamp);
 
 		std::string strDirection;
 		if (data->direction == 0)
@@ -179,8 +181,10 @@ static void image_writer (void)
 
 		if (data->stereo)
 		{
-			cv::imwrite((captureDir + strDirection + std::string("left/") + fileName).c_str(), data->imgLeft, pngParams);
-			cv::imwrite((captureDir + strDirection + std::string("right/") + fileName).c_str(), data->imgRight, pngParams);
+			cv::imwrite((captureDir + strDirection + std::string("left/") + fileName).c_str(), data->imgLeft);
+			cv::imwrite((captureDir + strDirection + std::string("right/") + fileName2).c_str(), data->imgRight, pngParams);
+			//cv::imwrite((captureDir + strDirection + std::string("left/") + fileName).c_str(), data->imgLeft, pngParams);
+			//cv::imwrite((captureDir + strDirection + std::string("right/") + fileName).c_str(), data->imgRight, pngParams);
 		}
 		else
 		{
@@ -459,7 +463,7 @@ void prepareCaptureFile( ofstream& file, const string& dir, const string& filena
 	
 	//! PNG Param setup
 	pngParams.push_back(CV_IMWRITE_PNG_COMPRESSION);
-	params.push_back(0);   // that's compression level, 9 == full , 0 == none
+	pngParams.push_back(0);   // that's compression level, 9 == full , 0 == none
 }
 
 /**
@@ -551,13 +555,15 @@ static void mavlink_handler (const lcm_recv_buf_t *rbuf, const char * channel, c
 						bPause = false;
 						
 						// Wait something variable...
+						unsigned int prev_cnt = 0;
 						while(g_async_queue_length(image_write_queue) > 0)
 						{
-							if(!(g_async_queue_length(image_write_queue) % 10))
+							if(g_async_queue_length(image_write_queue) != prev_cnt)
 							{
 								sprintf((char*)&statustext.text, "MAVCONN: imagecapture: %d remaining ...", g_async_queue_length(image_write_queue));
 								mavlink_msg_statustext_encode(sysid, compid, &msg, &statustext);
 								sendMAVLinkMessage(lcmMavlink, &msg);
+								prev_cnt = g_async_queue_length(image_write_queue);
 							}
 						}
 						
