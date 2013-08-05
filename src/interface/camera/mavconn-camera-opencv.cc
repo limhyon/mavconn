@@ -25,11 +25,11 @@ This file is part of the PIXHAWK project
 * @file
 *   @brief Camera driver.
 *
-*   This camera driver currently supports the Point Grey Firefly MV and
-*   mvBlueFOX cameras, and the OpenCV camera interface.
+*   This camera driver currently supports the OpenCV and OpenNI-based RGBD camera interface.
 *
 *   @author Lorenz Meier <mavteam@student.ethz.ch>
 *   @author Lionel Heng  <hengli@inf.ethz.ch>
+*   @author Hyon Lim     <limhyon@gmail.com, hyonlim@snu.ac.kr>
 *
 */
 
@@ -59,6 +59,11 @@ typedef struct _bufferIMU
 	//uint64_t delay;
 } bufferIMU_t;
 
+mavlink_attitude_t last_known_attitude;
+mavlink_local_position_ned_t last_known_control_position;
+mavlink_optical_flow_t last_known_optical_flow;
+mavlink_vicon_position_estimate_t last_known_vicon_position;
+
 const int MAGIC_MAX_BUFFER_AND_RETRY = 100;		// Size of the message buffer for LCM messages and maximum number of skipped/dropped frames before stopping when a mismatch happens
 const int MAGIC_MIN_SEQUENCE_DIFF = 150;		// *has to be > than MAGIC_MAX_BUFFER_AND_RETRY!* Minimum difference between two consecutively processed images to assume a sequence mismatch
 												// In other words: the maximum number of skippable frames
@@ -68,6 +73,7 @@ const int MAGIC_MAX_IMAGE_DELAY_US = 5000000;	// Maximum delay allowed between s
 const int MAGIC_HARD_RETRY_MUTEX = 2;			// Maximum number of times a mutex is tried to timed lock
 
 Glib::StaticMutex messageMutex;		//mutex controlling the access to the message buffer
+Glib::StaticMutex metaDataMutex;                        //mutex controlling the access to the meta data
 Glib::StaticMutex imageMutex;			//mutex controlling the access to the image data
 Glib::StaticMutex imageGrabbedMutex;  //separate mutex for the image grabbed condition because libdc grab blocks
 
@@ -81,6 +87,7 @@ bool processingDone = false;				//variable to check the validity of the processi
 namespace config = boost::program_options;
 
 bool quit = false;
+bool trigger = false;
 
 void
 signalHandler(int signal)
@@ -114,6 +121,7 @@ mavlinkHandler(const lcm_recv_buf_t* rbuf, const char* channel,
 	// Handle param messages
 	paramClient->handleMAVLinkPacket(msg);
 
+	if(trigger){
 	if (msg->msgid == MAVLINK_MSG_ID_IMAGE_TRIGGERED)
 	{
 
@@ -146,6 +154,33 @@ mavlinkHandler(const lcm_recv_buf_t* rbuf, const char* channel,
 		messageQueueNotEmptyCond->signal();
 		messageMutex.unlock();
 		Glib::Thread::yield();
+	}
+	}else
+	{
+		if (msg->msgid == MAVLINK_MSG_ID_ATTITUDE)
+                {
+                        metaDataMutex.lock();
+                        mavlink_msg_attitude_decode(msg, &last_known_attitude);
+                        metaDataMutex.unlock();
+                }
+                else if (msg->msgid == MAVLINK_MSG_ID_LOCAL_POSITION_NED)
+                {
+                        metaDataMutex.lock();
+                        mavlink_msg_local_position_ned_decode(msg, &last_known_control_position);
+                        metaDataMutex.unlock();
+                }
+                else if (msg->msgid == MAVLINK_MSG_ID_OPTICAL_FLOW)
+                {
+                        metaDataMutex.lock();
+                        mavlink_msg_optical_flow_decode(msg, &last_known_optical_flow);
+                        metaDataMutex.unlock();
+                }
+                else if (msg->msgid == MAVLINK_MSG_ID_VICON_POSITION_ESTIMATE)
+                {
+                        metaDataMutex.lock();
+                        mavlink_msg_vicon_position_estimate_decode(msg, &last_known_vicon_position);
+                        metaDataMutex.unlock();
+                }
 	}
 }
 
@@ -239,7 +274,6 @@ int main(int argc, char* argv[])
 	bool automode;		///< Use auto brightness/gain/exposure/gamma
 	float frameRate;	///< Frame rate in Hz
 
-	bool trigger = false;
 	bool triggerslave = false;
 	bool rgbd_cam = false;
 
@@ -312,23 +346,21 @@ int main(int argc, char* argv[])
 	//<-- guarded by messageMutex
 
 	mavconn_mavlink_msg_container_t_subscription_t* mavlinkSub = NULL;
-	if (trigger)
-	{
-		mavlinkSub = mavconn_mavlink_msg_container_t_subscribe(lcm, MAVLINK_MAIN, &mavlinkHandler, &dataBuffer);
-		if (!verbose)
-		{
-			fprintf(stderr, "# INFO: Subscribed to %s LCM channel.\n", MAVLINK_MAIN);
-		}
+	mavlinkSub = mavconn_mavlink_msg_container_t_subscribe(lcm, MAVLINK_MAIN, &mavlinkHandler, &dataBuffer);
 
-		try
-		{
-			lcmThread = Glib::Thread::create(sigc::bind(sigc::ptr_fun(lcmWait), lcm), true);
-		}
-		catch (const Glib::ThreadError& e)
-		{
-			fprintf(stderr, "# ERROR: Cannot create LCM handling thread.\n");
-			exit(EXIT_FAILURE);
-		}
+	if (!verbose)
+	{
+		fprintf(stderr, "# INFO: Subscribed to %s LCM channel.\n", MAVLINK_MAIN);
+	}
+
+	try
+	{
+		lcmThread = Glib::Thread::create(sigc::bind(sigc::ptr_fun(lcmWait), lcm), true);
+	}
+	catch (const Glib::ThreadError& e)
+	{
+		fprintf(stderr, "# ERROR: Cannot create LCM handling thread.\n");
+		exit(EXIT_FAILURE);
 	}
 
 	// Init image grabbing mutex/conditions
@@ -536,6 +568,11 @@ int main(int argc, char* argv[])
 		}
 		messageMutex.unlock();
 	}
+
+	memset(&last_known_attitude, 0, sizeof(mavlink_attitude_t));
+        memset(&last_known_control_position, 0, sizeof(mavlink_local_position_ned_t));
+        memset(&last_known_optical_flow, 0, sizeof(mavlink_optical_flow_t));
+        memset(&last_known_vicon_position, 0, sizeof(last_known_vicon_position));
 
 	uint64_t lastShutter = 0;
 //	uint64_t lastMessageDelay = 0;
@@ -829,6 +866,21 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
+
+		metaDataMutex.lock();
+                image_data.roll = last_known_attitude.roll;
+                image_data.pitch = last_known_attitude.pitch;
+                image_data.yaw = last_known_attitude.yaw;
+                image_data.lon = last_known_control_position.x;
+                image_data.lat = last_known_control_position.y;
+                image_data.alt = last_known_control_position.z;
+                image_data.local_z = last_known_optical_flow.ground_distance;
+                image_data.ground_x = last_known_vicon_position.x;
+                image_data.ground_y = last_known_vicon_position.y;
+                image_data.ground_z = last_known_vicon_position.z;
+                image_data.seq = 0;
+                metaDataMutex.unlock();
+
 			if (useStereo && camType.compare("opencv-depth") != 0)
 			{
 				if (!pxStereoCam->grabFrame(frame, frameRight, skippedFrames, sequenceNum))
@@ -1146,13 +1198,10 @@ int main(int argc, char* argv[])
 		pxCam->stop();
 	}
 
-	if (trigger)
-	{
-		mavconn_mavlink_msg_container_t_unsubscribe(lcm, mavlinkSub);
-		lcmThread->join();
-		//imageThread->join();
-		usleep(1000000); //instead of joining which can hang forever when camera crashed just sleep 100ms
-	}
+	mavconn_mavlink_msg_container_t_unsubscribe(lcm, mavlinkSub);
+	lcmThread->join();
+	//imageThread->join();
+	usleep(1000000); //instead of joining which can hang forever when camera crashed just sleep 100ms
 
 	// Disconnect from LCM
 	lcm_destroy(lcm);
